@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dubito: Concetti</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #11131a;
+    --ink-2: #191c26;
+    --ink-3: #23273370;
+    --paper: #eae7de;
+    --paper-dim: #a9a79fb0;
+    --amber: #e7a33e;
+    --teal: #3f9d92;
+    --magenta: #c2517c;
+    --indigo: #7b7fd6;
+    --coral: #d97a5f;
+    --sage: #8fae6b;
+    --danger: #d1495b;
+    --ok: #4caf7d;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #1c2130 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #241a24 0%, transparent 55%),
+      var(--ink);
+    color: var(--paper);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, .revealed-card, .team-name, .btn {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  #app {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* ---------- setup ---------- */
+  .setup-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 12vh;
+  }
+  .setup-panel h1 {
+    font-size: 2.4rem;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .setup-panel h1::after {
+    content: "";
+    display: block;
+    width: 64px;
+    height: 4px;
+    margin-top: 10px;
+    background: linear-gradient(90deg, var(--amber), var(--magenta));
+    border-radius: 2px;
+  }
+  .subtitle {
+    color: var(--paper-dim);
+    font-size: 0.95rem;
+    margin: 0 0 8px;
+  }
+  .setup-panel label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  select, input[type="text"] {
+    background: var(--ink-2);
+    border: 1px solid #ffffff1a;
+    color: var(--paper);
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-family: inherit;
+    width: 100%;
+  }
+  .names-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .name-field { display: flex; flex-direction: column; gap: 4px; }
+  .start-btn { margin-top: 18px; align-self: flex-start; }
+
+  .nums-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .csv-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #ffffff08;
+    border: 1px dashed #ffffff30;
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: -4px;
+  }
+  .csv-hint { margin: 0; font-size: 0.8rem; color: var(--paper-dim); }
+  .csv-status { margin: 0; font-size: 0.8rem; color: var(--teal); }
+  .sample-link { color: var(--amber); font-size: 0.85rem; text-decoration: underline; }
+  .error-box { color: var(--danger); font-size: 0.85rem; min-height: 1.2em; margin: 0; }
+  input[type="file"] { color: var(--paper); font-size: 0.85rem; }
+
+  /* ---------- scoreboard ---------- */
+  .scoreboard {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .team-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    background: var(--ink-2);
+    border: 1px solid #ffffff14;
+    position: relative;
+    overflow: hidden;
+  }
+  .team-chip::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+  }
+  .t-amber::before { background: var(--amber); }
+  .t-teal::before { background: var(--teal); }
+  .t-magenta::before { background: var(--magenta); }
+  .t-indigo::before { background: var(--indigo); }
+  .t-coral::before { background: var(--coral); }
+  .t-sage::before { background: var(--sage); }
+  .team-chip.active {
+    box-shadow: 0 0 0 1.5px currentColor;
+  }
+  .t-amber.active { color: var(--amber); }
+  .t-teal.active { color: var(--teal); }
+  .t-magenta.active { color: var(--magenta); }
+  .t-indigo.active { color: var(--indigo); }
+  .t-coral.active { color: var(--coral); }
+  .t-sage.active { color: var(--sage); }
+  .team-name { font-size: 0.95rem; font-weight: 600; color: var(--paper); }
+  .score-row { display: flex; align-items: center; gap: 8px; }
+  .team-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 500;
+    cursor: pointer;
+    min-width: 1.6em;
+    text-align: center;
+  }
+  .score-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #ffffff30;
+    background: #ffffff0d;
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .score-btn:hover { background: #ffffff22; }
+  .team-cards { font-size: 0.7rem; color: var(--paper-dim); font-family: 'JetBrains Mono', monospace; }
+
+  /* ---------- main panel ---------- */
+  .main-panel {
+    background: var(--ink-2);
+    border: 1px solid #ffffff14;
+    border-radius: var(--radius);
+    padding: 22px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 220px;
+  }
+  .turn-banner {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .turn-banner strong { color: var(--paper); }
+
+  .instructions { margin: 0; color: var(--paper-dim); font-size: 0.95rem; }
+
+  .revealed-card {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    padding: 20px;
+    text-align: center;
+    background: linear-gradient(160deg, #262b3a, #1a1d27);
+    border-radius: 10px;
+    border: 1px solid #ffffff1a;
+  }
+
+  .definition {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--paper);
+    background: #ffffff0a;
+    border-left: 3px solid var(--amber);
+    padding: 14px 16px;
+    border-radius: 0 10px 10px 0;
+  }
+
+  .card-picker { display: flex; flex-direction: column; gap: 14px; }
+  .hand-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .card-back {
+    aspect-ratio: 2/3;
+    border-radius: 10px;
+    border: 1px dashed #ffffff30;
+    background: repeating-linear-gradient(135deg, #20242f, #20242f 6px, #1a1d27 6px, #1a1d27 12px);
+    color: var(--paper-dim);
+    font-size: 1.4rem;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+  }
+  .card-back:hover { border-color: var(--amber); color: var(--amber); }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+  .btn-row.wrap { flex-wrap: wrap; }
+
+  .btn {
+    flex: 1;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.08s ease, filter 0.15s ease;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-know { background: var(--teal); color: #06211d; }
+  .btn-dont { background: #ffffff14; color: var(--paper); }
+  .btn-doubt { background: var(--magenta); color: #250712; flex: none; }
+  .btn-correct { background: var(--ok); color: #06210f; }
+  .btn-wrong { background: var(--danger); color: #2a0509; }
+  .btn:hover { filter: brightness(1.08); }
+
+  /* ---------- log ---------- */
+  .log {
+    background: var(--ink-2);
+    border: 1px solid #ffffff14;
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .log h3 {
+    margin: 0 0 8px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--paper-dim);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .log ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
+  .log li {
+    font-size: 0.85rem;
+    color: var(--paper-dim);
+    border-bottom: 1px solid #ffffff0d;
+    padding-bottom: 6px;
+  }
+  .log li:first-child { color: var(--paper); }
+
+  /* ---------- game over ---------- */
+  .game-over { align-items: center; text-align: center; }
+  .final-ranking { list-style: decimal; font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; padding-left: 28px; align-self: stretch; }
+  .final-ranking li { margin-bottom: 8px; }
+
+  @media (max-width: 420px) {
+    .names-grid { grid-template-columns: 1fr; }
+    .hand-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .revealed-card { font-size: 1.4rem; padding: 16px; }
+  }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="decks.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
