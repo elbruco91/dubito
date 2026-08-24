@@ -14,6 +14,26 @@ Nella schermata iniziale ora si può impostare:
 
 Formato CSV: due colonne, `term,definition` (la prima riga come intestazione è facoltativa — se non è "term/concetto/parola" viene trattata già come contenuto). Dal menu di setup c'è un link "Scarica un CSV di esempio" che genera il file nel formato corretto partendo dal mazzo integrato. Il mazzo caricato deve contenere almeno *team × carte per team* righe, altrimenti l'app mostra un errore invece di far partire la partita.
 
+## Carte fisiche e assegnazione manuale
+
+Dal menu di setup si può:
+- **stampare le carte fisiche** del mazzo selezionato (🖨), con un lato pubblico numerato da ritagliare e una tabella di riferimento numero → concetto per il/la formatore/trice;
+- spuntare **"Assegna le carte manualmente ai team"** se le carte fisiche sono già state distribuite: in questo caso si inseriscono i numeri delle carte di ciascun team (es. `1,5,9,13`) invece di lasciare che l'app le distribuisca a caso.
+
+Durante la partita, quando un team gioca una carta ne sceglie semplicemente il numero: il contenuto (termine/definizione) resta quello scritto sulla carta fisica corrispondente.
+
+## Modifica del mazzo integrato
+
+Dal menu di setup, il pulsante "✏️ Modifica le carte del mazzo integrato" (protetto da password) apre un editor per cambiare termine e definizione di ciascuna delle 16 carte del mazzo Cybersecurity. Le modifiche vengono salvate nel `localStorage` del browser/dispositivo usato e restano finché non si preme "↺ Ripristina originali".
+
+## Pausa, fine partita e cronologia
+
+Durante la partita, dalla barra in alto:
+- **↶ Annulla / ↷ Ripeti** tornano indietro o rifanno l'ultima azione (fino a 60 passi);
+- **⏸ Pausa** nasconde il contenuto della carta corrente (utile se serve interrompere senza rivelare nulla);
+- **⏹ Termina** chiude la partita subito, congelando il punteggio attuale;
+- **🏠 Menu** torna alla schermata iniziale, abbandonando la partita in corso.
+
 ## Correzione manuale dei punteggi
 
 Accanto al punteggio di ogni team, in qualsiasi momento della partita:
@@ -48,6 +68,8 @@ decks.js      mazzi di concetti — qui vanno aggiunti i mazzi per altre lezioni
 ## Aggiungere un nuovo mazzo (altro argomento)
 
 Apri `decks.js`, copia il blocco `cybersecurity`, cambia chiave/nome e i 16 concetti con relative definizioni, poi aggiungi la voce a `DECK_LIST` in fondo al file. Non serve toccare `app.js`.
+
+Nota: `app.js` mostra nel menu di setup solo il mazzo `cybersecurity` più il caricamento CSV — per selezionare anche altri mazzi aggiunti a `decks.js` va aggiornata la funzione `showSetup()` in `app.js`.
 
 ## Uso in classe
 
