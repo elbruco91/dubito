@@ -4,27 +4,41 @@ Gioco da classe ispirato a "Dubito", per ripassare concetti visti a lezione tram
 
 Nessun login, nessuna build: è puro HTML/CSS/JS, apribile direttamente in un browser o ospitabile gratis su GitHub Pages.
 
-## Personalizzazione (numero team, carte, contenuti)
+## Schermata iniziale
 
-Nella schermata iniziale ora si può impostare:
+All'apertura dell'app c'è un menu con cinque voci:
+
+- **▶️ Inizia partita** → apre la pagina "Nuova partita" (numero di team, carte per team, scelta del mazzo, flag per l'assegnazione manuale, nomi dei team).
+- **⏯ Riprendi partita** → visibile solo se c'è una partita in corso non ancora conclusa, riporta esattamente al turno in sospeso.
+- **🗂 Vedi mazzi** → elenco di tutti i mazzi disponibili, con anteprima dei concetti e stampa delle carte fisiche.
+- **⚙️ Impostazioni avanzate** → protetta da password (`Maur0!`), per caricare nuovi mazzi da CSV o modificare i concetti di un mazzo esistente.
+- **📖 Regole / Come si gioca** → riepilogo delle regole per chi guida la partita.
+
+Da qualunque pagina secondaria si torna al menu con "← Home"; durante una partita, il pulsante "🏠 Menu" nella barra in alto fa lo stesso senza interrompere la partita (si può riprendere in seguito).
+
+## Nuova partita (numero team, carte, contenuti)
+
+Nella pagina "Nuova partita" si imposta:
 
 - **numero di team** (2–6),
 - **carte per team** (2–8),
-- **mazzo**: quello integrato (Cybersecurity, 16 concetti) oppure un **CSV personalizzato** caricato al volo.
+- **mazzo**: uno qualsiasi tra quelli disponibili (integrati + quelli creati da "Impostazioni avanzate"),
+- **assegnazione manuale**: se spuntata, si inseriscono i numeri delle carte fisiche già distribuite a ciascun team (es. `1,5,9,13`) invece di lasciare che l'app le distribuisca a caso,
+- i **nomi dei team**.
 
-Formato CSV: due colonne, `term,definition` (la prima riga come intestazione è facoltativa — se non è "term/concetto/parola" viene trattata già come contenuto). Dal menu di setup c'è un link "Scarica un CSV di esempio" che genera il file nel formato corretto partendo dal mazzo integrato. Il mazzo caricato deve contenere almeno *team × carte per team* righe, altrimenti l'app mostra un errore invece di far partire la partita.
+## Vedi mazzi, carte fisiche e stampa
 
-## Carte fisiche e assegnazione manuale
-
-Dal menu di setup si può:
-- **stampare le carte fisiche** del mazzo selezionato (🖨), con un lato pubblico numerato da ritagliare e una tabella di riferimento numero → concetto per il/la formatore/trice;
-- spuntare **"Assegna le carte manualmente ai team"** se le carte fisiche sono già state distribuite: in questo caso si inseriscono i numeri delle carte di ciascun team (es. `1,5,9,13`) invece di lasciare che l'app le distribuisca a caso.
+La pagina "Vedi mazzi" elenca ogni mazzo con il numero di concetti e un pannello a comparsa per consultarli. Ogni mazzo ha un pulsante **🖨 Stampa questo mazzo**, che genera un foglio con un lato pubblico numerato (da ritagliare) e una tabella di riferimento numero → concetto per chi guida il gioco.
 
 Durante la partita, quando un team gioca una carta ne sceglie semplicemente il numero: il contenuto (termine/definizione) resta quello scritto sulla carta fisica corrispondente.
 
-## Modifica del mazzo integrato
+## Impostazioni avanzate: mazzi personalizzati
 
-Dal menu di setup, il pulsante "✏️ Modifica le carte del mazzo integrato" (protetto da password) apre un editor per cambiare termine e definizione di ciascuna delle 16 carte del mazzo Cybersecurity. Le modifiche vengono salvate nel `localStorage` del browser/dispositivo usato e restano finché non si preme "↺ Ripristina originali".
+La pagina "Impostazioni avanzate" (password `Maur0!`) permette di:
+- **caricare un nuovo mazzo da CSV** (colonne `term,definition`, prima riga facoltativa come intestazione), dandogli un nome — diventa subito selezionabile in "Nuova partita" e in "Vedi mazzi";
+- **modificare le carte di un mazzo esistente** (integrato o caricato): il numero di ogni carta resta fisso (corrisponde al lato pubblico già stampato), mentre concetto e definizione sono modificabili. Per i mazzi integrati c'è un pulsante "↺ Ripristina originali"; per quelli caricati c'è "🗑 Elimina mazzo".
+
+Tutte le modifiche vengono salvate nel `localStorage` del browser/dispositivo usato.
 
 ## Pausa, fine partita e cronologia
 
@@ -32,7 +46,7 @@ Durante la partita, dalla barra in alto:
 - **↶ Annulla / ↷ Ripeti** tornano indietro o rifanno l'ultima azione (fino a 60 passi);
 - **⏸ Pausa** nasconde il contenuto della carta corrente (utile se serve interrompere senza rivelare nulla);
 - **⏹ Termina** chiude la partita subito, congelando il punteggio attuale;
-- **🏠 Menu** torna alla schermata iniziale, abbandonando la partita in corso.
+- **🏠 Menu** torna alla schermata iniziale senza perdere la partita in corso (si riprende da "⏯ Riprendi partita").
 
 ## Correzione manuale dei punteggi
 
@@ -67,14 +81,14 @@ decks.js      mazzi di concetti — qui vanno aggiunti i mazzi per altre lezioni
 
 ## Aggiungere un nuovo mazzo (altro argomento)
 
-Apri `decks.js`, copia il blocco `cybersecurity`, cambia chiave/nome e i 16 concetti con relative definizioni, poi aggiungi la voce a `DECK_LIST` in fondo al file. Non serve toccare `app.js`.
+Il modo più semplice è dalla pagina "Impostazioni avanzate" → "Carica un nuovo mazzo da CSV" (vedi sopra), senza toccare il codice.
 
-Nota: `app.js` mostra nel menu di setup solo il mazzo `cybersecurity` più il caricamento CSV — per selezionare anche altri mazzi aggiunti a `decks.js` va aggiornata la funzione `showSetup()` in `app.js`.
+In alternativa, per includere un mazzo direttamente nel codice sorgente: apri `decks.js`, copia il blocco `cybersecurity`, cambia chiave/nome e i concetti con relative definizioni, poi aggiungi la voce a `DECK_LIST` in fondo al file. Non serve toccare `app.js`: la lista dei mazzi nel menu si aggiorna automaticamente.
 
 ## Uso in classe
 
 1. Apri `index.html` sul dispositivo che proietti (o collegalo allo schermo).
-2. Scegli il mazzo, inserisci i nomi dei team, avvia.
+2. Dal menu iniziale scegli "▶️ Inizia partita", imposta mazzo e nomi dei team, avvia.
 3. Il/la formatore/trice guida i click seguendo le dichiarazioni verbali dei team, e giudica "Corretto/Sbagliato" quando qualcuno risponde.
 
 ## Deploy gratuito su GitHub Pages

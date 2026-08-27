@@ -1,6 +1,7 @@
 /* ============================================================
    DUBITO — motore di gioco
-   Stati del turno:
+   Schermate: home -> setup -> game | decks | admin | rules
+   Stati del turno (dentro "game"):
    draw -> caller-declare -> others-declare -> caller-action
    -> (challenge-response -> caller-action)*  -> final-guess?
    -> resolve -> reveal -> (next turn | game-over)
@@ -11,36 +12,99 @@ const TEAM_COLORS = ["t-amber", "t-teal", "t-magenta", "t-indigo", "t-coral", "t
 let state = null;
 let historyStack = [];
 let redoStack = [];
+let currentView = "home";
+let adminUnlocked = false;
 
-/* ---------- mazzo integrato modificabile (persistito nel browser) ---------- */
+/* ---------- mazzi: integrati + personalizzati (persistiti nel browser) ---------- */
 
-const ORIGINAL_DECKS = JSON.parse(JSON.stringify(DECKS));
-const CUSTOM_DECK_KEY = "dubito_custom_cybersecurity";
+const DECK_STORE_KEY = "dubito_deck_store";
 const EDITOR_PASSWORD = "Maur0!";
 
-function loadCustomDeckFromStorage() {
+const BUILTIN_DECKS = JSON.parse(JSON.stringify(DECKS));
+const BUILTIN_DECK_LIST = JSON.parse(JSON.stringify(DECK_LIST));
+
+let deckStore = {};
+
+function loadDeckStore() {
   try {
-    const raw = localStorage.getItem(CUSTOM_DECK_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length === ORIGINAL_DECKS.cybersecurity.cards.length) {
-      DECKS.cybersecurity.cards = parsed;
+    const raw = localStorage.getItem(DECK_STORE_KEY);
+    deckStore = raw ? JSON.parse(raw) : {};
+  } catch (e) { deckStore = {}; }
+}
+
+function persistDeckStore() {
+  try { localStorage.setItem(DECK_STORE_KEY, JSON.stringify(deckStore)); } catch (e) { /* ignora */ }
+}
+
+function migrateLegacyCustomDeck() {
+  try {
+    const raw = localStorage.getItem("dubito_custom_cybersecurity");
+    if (!raw || deckStore.cybersecurity) return;
+    const cards = JSON.parse(raw);
+    if (Array.isArray(cards) && cards.length === BUILTIN_DECKS.cybersecurity.cards.length) {
+      deckStore.cybersecurity = { name: "Cybersecurity", cards };
+      persistDeckStore();
     }
-  } catch (e) { /* localStorage non disponibile o dati corrotti: si tiene il mazzo originale */ }
-}
-loadCustomDeckFromStorage();
-
-function saveCustomDeck(cards) {
-  DECKS.cybersecurity.cards = cards;
-  try { localStorage.setItem(CUSTOM_DECK_KEY, JSON.stringify(cards)); } catch (e) { /* ignora */ }
+  } catch (e) { /* ignora */ }
 }
 
-function resetCustomDeck() {
-  DECKS.cybersecurity.cards = JSON.parse(JSON.stringify(ORIGINAL_DECKS.cybersecurity.cards));
-  try { localStorage.removeItem(CUSTOM_DECK_KEY); } catch (e) { /* ignora */ }
+loadDeckStore();
+migrateLegacyCustomDeck();
+
+function getDeckList() {
+  const list = BUILTIN_DECK_LIST.map((d) => ({
+    key: d.key,
+    label: (deckStore[d.key] && deckStore[d.key].name) || d.label,
+  }));
+  Object.keys(deckStore).forEach((key) => {
+    if (!BUILTIN_DECK_LIST.some((d) => d.key === key)) {
+      list.push({ key, label: deckStore[key].name });
+    }
+  });
+  return list;
 }
 
-/* ---------- cronologia / annulla-ripeti ---------- */
+function isBuiltinDeck(key) { return BUILTIN_DECK_LIST.some((d) => d.key === key); }
+
+function getDeckCards(key) {
+  if (deckStore[key]) return deckStore[key].cards;
+  if (BUILTIN_DECKS[key]) return BUILTIN_DECKS[key].cards;
+  return null;
+}
+
+function saveDeckOverride(key, name, cards) {
+  deckStore[key] = { name, cards };
+  persistDeckStore();
+}
+
+function clearDeckOverride(key) {
+  delete deckStore[key];
+  persistDeckStore();
+}
+
+const DIACRITICS_RE = new RegExp("[" + String.fromCharCode(0x0300) + "-" + String.fromCharCode(0x036f) + "]", "g");
+
+function slugify(text) {
+  return (
+    text
+      .toLowerCase()
+      .trim()
+      .normalize("NFD")
+      .replace(DIACRITICS_RE, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "mazzo"
+  );
+}
+
+function uniqueDeckKey(base) {
+  const existing = getDeckList().map((d) => d.key);
+  let key = base;
+  let n = 2;
+  while (existing.includes(key)) { key = `${base}_${n}`; n++; }
+  return key;
+}
+
+/* ---------- cronologia / annulla-ripeti (partita) ---------- */
 
 function pushHistory() {
   if (!state) return;
@@ -153,7 +217,7 @@ function promptExactScore(teamId) {
   render();
 }
 
-/* ---------- pausa / fine / menu ---------- */
+/* ---------- pausa / fine partita ---------- */
 
 function togglePause() {
   state.paused = !state.paused;
@@ -168,12 +232,38 @@ function endGameNow() {
   render();
 }
 
-function goToMenu() {
-  if (!window.confirm("Tornare al menu? La partita in corso andrà persa.")) return;
-  state = null;
-  historyStack = [];
-  redoStack = [];
-  showSetup();
+/* ---------- navigazione fra schermate ---------- */
+
+function showHome() { currentView = "home"; renderApp(); }
+function showNewGameSetup() { currentView = "setup"; renderApp(); }
+function showDecksScreen() { currentView = "decks"; renderApp(); }
+function showRulesScreen() { currentView = "rules"; renderApp(); }
+
+function showGameScreen() {
+  if (!state) { showHome(); return; }
+  currentView = "game";
+  render();
+}
+
+function showAdminScreen() {
+  if (!adminUnlocked) {
+    const pw = window.prompt("Inserisci la password per le impostazioni avanzate:");
+    if (pw === null) return;
+    if (pw !== EDITOR_PASSWORD) { window.alert("Password errata."); return; }
+    adminUnlocked = true;
+  }
+  currentView = "admin";
+  renderApp();
+}
+
+function startNewGameFlow() {
+  if (state && !state.gameOver) {
+    if (!window.confirm("C'è già una partita in corso. Iniziarne una nuova interromperà quella attuale e il punteggio andrà perso. Continuare?")) return;
+    state = null;
+    historyStack = [];
+    redoStack = [];
+  }
+  showNewGameSetup();
 }
 
 /* ---------- azioni di gioco ---------- */
@@ -332,7 +422,7 @@ function revealDefinitionAndContinue() {
   render();
 }
 
-/* ---------- rendering ---------- */
+/* ---------- rendering: helper generico ---------- */
 
 function el(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
@@ -347,6 +437,400 @@ function el(tag, attrs = {}, ...children) {
   });
   return e;
 }
+
+function renderBackHome() {
+  return el("div", { class: "top-bar" }, el("button", { class: "icon-btn", onclick: showHome }, "← Home"));
+}
+
+/* ---------- rendering: dispatcher fra schermate ---------- */
+
+function renderApp() {
+  if (currentView === "game") { render(); return; }
+  const root = document.getElementById("app");
+  root.innerHTML = "";
+  switch (currentView) {
+    case "setup": root.appendChild(renderNewGameSetup()); break;
+    case "decks": root.appendChild(renderDecksScreen()); break;
+    case "admin": root.appendChild(renderAdminScreen()); break;
+    case "rules": root.appendChild(renderRulesScreen()); break;
+    case "home":
+    default: root.appendChild(renderHome()); break;
+  }
+}
+
+/* ---------- rendering: home ---------- */
+
+function renderHome() {
+  const wrap = el("div", { class: "setup-panel home-panel" });
+  wrap.appendChild(el("h1", {}, "Dubito: Concetti"));
+  wrap.appendChild(el("p", { class: "subtitle" }, "Un gioco di bluff sui concetti visti in classe."));
+
+  const menu = el("div", { class: "home-menu" });
+  menu.appendChild(el("button", { class: "btn btn-know home-btn", onclick: startNewGameFlow }, "▶️ Inizia partita"));
+  if (state && !state.gameOver) {
+    menu.appendChild(el("button", { class: "btn btn-know home-btn", onclick: showGameScreen }, "⏯ Riprendi partita"));
+  }
+  menu.appendChild(el("button", { class: "btn btn-dont home-btn", onclick: showDecksScreen }, "🗂 Vedi mazzi"));
+  menu.appendChild(el("button", { class: "btn btn-dont home-btn", onclick: showAdminScreen }, "⚙️ Impostazioni avanzate"));
+  menu.appendChild(el("button", { class: "btn btn-dont home-btn", onclick: showRulesScreen }, "📖 Regole / Come si gioca"));
+  wrap.appendChild(menu);
+
+  return wrap;
+}
+
+/* ---------- rendering: setup nuova partita ---------- */
+
+function renderNewGameSetup() {
+  let nameInputs = [];
+  let assignInputs = [];
+
+  const wrap = el("div", { class: "setup-panel" });
+  wrap.appendChild(renderBackHome());
+  wrap.appendChild(el("h1", {}, "Nuova partita"));
+  wrap.appendChild(el("p", { class: "subtitle" }, "Imposta team, carte e mazzo prima di iniziare."));
+
+  const numsRow = el("div", { class: "nums-row" });
+  const teamCountInput = el("input", { type: "number", min: "2", max: "6", value: "4" });
+  const cardsPerTeamInput = el("input", { type: "number", min: "2", max: "8", value: "4" });
+  numsRow.appendChild(el("div", { class: "name-field" }, el("label", {}, "Numero di team"), teamCountInput));
+  numsRow.appendChild(el("div", { class: "name-field" }, el("label", {}, "Carte per team"), cardsPerTeamInput));
+  wrap.appendChild(numsRow);
+
+  wrap.appendChild(el("label", {}, "Mazzo di concetti"));
+  const deckSelect = el("select", {});
+  getDeckList().forEach((d) => {
+    const count = getDeckCards(d.key).length;
+    deckSelect.appendChild(el("option", { value: d.key }, `${d.label} (${count})`));
+  });
+  wrap.appendChild(deckSelect);
+
+  const manualToggleWrap = el("div", { class: "manual-toggle" });
+  const manualCheckbox = el("input", { type: "checkbox", id: "manual-assign" });
+  manualToggleWrap.appendChild(manualCheckbox);
+  manualToggleWrap.appendChild(el("label", { for: "manual-assign" }, "Assegna le carte manualmente ai team (carte fisiche già distribuite)"));
+  wrap.appendChild(manualToggleWrap);
+
+  const refDetails = el("details", { class: "ref-details" });
+  refDetails.appendChild(el("summary", {}, "Riferimento numero → concetto"));
+  const refTableBody = el("div", { class: "ref-table" });
+  refDetails.appendChild(refTableBody);
+  wrap.appendChild(refDetails);
+
+  function refreshReferenceTable() {
+    refTableBody.innerHTML = "";
+    numberPool(getDeckCards(deckSelect.value)).forEach((c) => {
+      refTableBody.appendChild(el("div", { class: "ref-row" }, el("span", { class: "ref-num" }, `#${c.id}`), el("span", {}, c.term)));
+    });
+  }
+  deckSelect.addEventListener("change", refreshReferenceTable);
+  refreshReferenceTable();
+
+  const namesWrap = el("div", { class: "names-grid" });
+  wrap.appendChild(namesWrap);
+
+  function renderTeamFields(count) {
+    namesWrap.innerHTML = "";
+    nameInputs = [];
+    assignInputs = [];
+    for (let i = 0; i < count; i++) {
+      const nameInput = el("input", { type: "text", placeholder: `Team ${i + 1}` });
+      nameInputs.push(nameInput);
+      const field = el("div", { class: "name-field" }, el("label", {}, `Team ${i + 1}`), nameInput);
+      if (manualCheckbox.checked) {
+        const assignInput = el("input", { type: "text", placeholder: "es. 1,5,9,13" });
+        assignInputs.push(assignInput);
+        field.appendChild(el("label", { class: "assign-label" }, "Numeri carte"));
+        field.appendChild(assignInput);
+      } else {
+        assignInputs.push(null);
+      }
+      namesWrap.appendChild(field);
+    }
+  }
+  renderTeamFields(4);
+
+  teamCountInput.addEventListener("change", () => {
+    let n = parseInt(teamCountInput.value, 10);
+    if (Number.isNaN(n)) n = 4;
+    n = Math.max(2, Math.min(6, n));
+    teamCountInput.value = n;
+    renderTeamFields(n);
+  });
+  manualCheckbox.addEventListener("change", () => {
+    renderTeamFields(parseInt(teamCountInput.value, 10) || 4);
+  });
+
+  const errorBox = el("p", { class: "error-box" }, "");
+  wrap.appendChild(errorBox);
+
+  wrap.appendChild(
+    el("button", {
+      class: "btn btn-know start-btn",
+      onclick: () => {
+        const teamCount = Math.max(2, Math.min(6, parseInt(teamCountInput.value, 10) || 4));
+        const cardsPerTeam = Math.max(2, Math.min(8, parseInt(cardsPerTeamInput.value, 10) || 4));
+        const needed = teamCount * cardsPerTeam;
+
+        const pool = getDeckCards(deckSelect.value);
+        const numbered = numberPool(pool);
+        const teamNames = nameInputs.map((inp, i) => inp.value.trim() || `Team ${i + 1}`);
+
+        if (manualCheckbox.checked) {
+          const assignments = [];
+          const usedNumbers = new Set();
+          for (let i = 0; i < teamCount; i++) {
+            const raw = (assignInputs[i] && assignInputs[i].value) || "";
+            const numbers = raw.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n));
+            if (numbers.length !== cardsPerTeam) {
+              errorBox.textContent = `${teamNames[i]}: servono esattamente ${cardsPerTeam} numeri, ne hai inseriti ${numbers.length}.`;
+              return;
+            }
+            for (const n of numbers) {
+              if (n < 1 || n > numbered.length) {
+                errorBox.textContent = `${teamNames[i]}: il numero ${n} non esiste nel mazzo (1–${numbered.length}).`;
+                return;
+              }
+              if (usedNumbers.has(n)) {
+                errorBox.textContent = `Il numero ${n} è assegnato a più di un team.`;
+                return;
+              }
+              usedNumbers.add(n);
+            }
+            assignments.push(numbers);
+          }
+          errorBox.textContent = "";
+          historyStack = [];
+          redoStack = [];
+          state = initStateManual(numbered, teamNames, assignments);
+          showGameScreen();
+        } else {
+          if (numbered.length < needed) {
+            errorBox.textContent = `Servono almeno ${needed} concetti (${teamCount} team × ${cardsPerTeam} carte), il mazzo scelto ne ha solo ${numbered.length}.`;
+            return;
+          }
+          errorBox.textContent = "";
+          historyStack = [];
+          redoStack = [];
+          state = initStateAuto(numbered, teamNames, cardsPerTeam);
+          showGameScreen();
+        }
+      },
+    }, "Inizia partita")
+  );
+
+  return wrap;
+}
+
+/* ---------- rendering: vedi mazzi / stampa ---------- */
+
+function renderDecksScreen() {
+  const wrap = el("div", { class: "setup-panel" });
+  wrap.appendChild(renderBackHome());
+  wrap.appendChild(el("h1", {}, "Mazzi disponibili"));
+  wrap.appendChild(el("p", { class: "subtitle" }, "Consulta i concetti di ogni mazzo e stampa le carte fisiche numerate."));
+
+  getDeckList().forEach((d) => {
+    const cards = getDeckCards(d.key);
+    const box = el("div", { class: "deck-box" });
+    box.appendChild(el(
+      "div", { class: "deck-box-header" },
+      el("span", { class: "deck-box-name" }, d.label),
+      el("span", { class: "deck-box-count" }, `${cards.length} concetti`)
+    ));
+
+    const details = el("details", { class: "ref-details" });
+    details.appendChild(el("summary", {}, "Vedi concetti"));
+    const list = el("div", { class: "ref-table" });
+    numberPool(cards).forEach((c) => {
+      list.appendChild(el("div", { class: "ref-row" }, el("span", { class: "ref-num" }, `#${c.id}`), el("span", {}, c.term)));
+    });
+    details.appendChild(list);
+    box.appendChild(details);
+
+    box.appendChild(el("button", {
+      class: "btn btn-dont print-btn",
+      onclick: () => printDeck(numberPool(cards)),
+    }, "🖨 Stampa questo mazzo"));
+
+    wrap.appendChild(box);
+  });
+
+  return wrap;
+}
+
+/* ---------- rendering: impostazioni avanzate (admin) ---------- */
+
+function renderAdminScreen() {
+  const wrap = el("div", { class: "setup-panel" });
+  wrap.appendChild(renderBackHome());
+  wrap.appendChild(el("h1", {}, "Impostazioni avanzate"));
+  wrap.appendChild(el("p", { class: "subtitle" }, "Carica nuovi mazzi o modifica i concetti di quelli esistenti."));
+
+  /* --- carica nuovo mazzo --- */
+  wrap.appendChild(el("h3", {}, "Carica un nuovo mazzo da CSV"));
+  let newDeckCards = null;
+  const newDeckNameInput = el("input", { type: "text", placeholder: "Nome del mazzo, es. Media Literacy" });
+  const newDeckFileInput = el("input", { type: "file", accept: ".csv" });
+  const newDeckStatus = el("p", { class: "csv-status" }, "");
+  newDeckFileInput.addEventListener("change", () => {
+    const file = newDeckFileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      newDeckCards = csvToCards(String(reader.result));
+      newDeckStatus.textContent = `${newDeckCards.length} concetti pronti da "${file.name}".`;
+    };
+    reader.readAsText(file, "UTF-8");
+  });
+  const sampleLink = el("a", { href: "#", class: "sample-link", onclick: (e) => { e.preventDefault(); downloadSampleCSV(); } }, "Scarica un CSV di esempio");
+  const createDeckStatus = el("p", { class: "csv-status" }, "");
+  const createDeckBtn = el("button", {
+    class: "btn btn-know",
+    onclick: () => {
+      const name = newDeckNameInput.value.trim();
+      if (!name) { createDeckStatus.textContent = "Inserisci un nome per il mazzo."; return; }
+      if (!newDeckCards || newDeckCards.length === 0) { createDeckStatus.textContent = "Carica prima un CSV valido."; return; }
+      const key = uniqueDeckKey(slugify(name));
+      saveDeckOverride(key, name, newDeckCards);
+      createDeckStatus.textContent = `Mazzo "${name}" creato con ${newDeckCards.length} concetti.`;
+      newDeckNameInput.value = "";
+      newDeckFileInput.value = "";
+      newDeckStatus.textContent = "";
+      newDeckCards = null;
+      refreshDeckSelect(key);
+    },
+  }, "➕ Crea mazzo");
+
+  wrap.appendChild(el(
+    "div", { class: "csv-block" },
+    el("p", { class: "csv-hint" }, "Colonne CSV: term, definition (prima riga facoltativa come intestazione)."),
+    el("div", { class: "name-field" }, el("label", {}, "Nome mazzo"), newDeckNameInput),
+    newDeckFileInput,
+    newDeckStatus,
+    sampleLink,
+    el("div", { class: "btn-row wrap" }, createDeckBtn),
+    createDeckStatus
+  ));
+
+  /* --- modifica mazzo esistente --- */
+  wrap.appendChild(el("h3", {}, "Modifica le carte di un mazzo"));
+  const deckSelect = el("select", {});
+  const editorPanel = el("div", { class: "editor-panel" });
+
+  function renderCardEditor(key) {
+    editorPanel.innerHTML = "";
+    const cards = getDeckCards(key);
+    if (!cards) return;
+    editorPanel.appendChild(el("p", { class: "csv-hint" }, "Max 60 caratteri per il concetto, max 300 per la definizione. Il numero di ogni carta resta fisso: corrisponde al lato pubblico già stampato."));
+
+    const rowInputs = cards.map((c) => ({
+      termInput: el("input", { type: "text", maxlength: "60", value: c.term }),
+      defInput: el("textarea", { maxlength: "300", rows: "2" }, c.definition),
+    }));
+
+    rowInputs.forEach((r, i) => {
+      const termCounter = el("span", { class: "char-counter" }, `${r.termInput.value.length}/60`);
+      const defCounter = el("span", { class: "char-counter" }, `${r.defInput.value.length}/300`);
+      r.termInput.addEventListener("input", () => { termCounter.textContent = `${r.termInput.value.length}/60`; });
+      r.defInput.addEventListener("input", () => { defCounter.textContent = `${r.defInput.value.length}/300`; });
+
+      editorPanel.appendChild(
+        el(
+          "div", { class: "editor-row" },
+          el("span", { class: "editor-num" }, `#${i + 1}`),
+          el(
+            "div", { class: "editor-fields" },
+            el("div", { class: "editor-field-label" }, el("label", {}, "Concetto"), termCounter),
+            r.termInput,
+            el("div", { class: "editor-field-label" }, el("label", {}, "Definizione"), defCounter),
+            r.defInput
+          )
+        )
+      );
+    });
+
+    const editorStatus = el("p", { class: "csv-status" }, "");
+    const saveBtn = el("button", {
+      class: "btn btn-know",
+      onclick: () => {
+        const updated = rowInputs.map((r, i) => ({
+          term: r.termInput.value.trim() || cards[i].term,
+          definition: r.defInput.value.trim(),
+        }));
+        const label = getDeckList().find((d) => d.key === key).label;
+        saveDeckOverride(key, label, updated);
+        editorStatus.textContent = "Modifiche salvate su questo dispositivo.";
+      },
+    }, "💾 Salva modifiche");
+
+    const actionsRow = el("div", { class: "btn-row wrap" }, saveBtn);
+    if (isBuiltinDeck(key)) {
+      actionsRow.appendChild(el("button", {
+        class: "btn btn-dont",
+        onclick: () => {
+          if (!window.confirm("Ripristinare i concetti originali di questo mazzo? Le modifiche salvate andranno perse.")) return;
+          clearDeckOverride(key);
+          refreshDeckSelect(key);
+        },
+      }, "↺ Ripristina originali"));
+    } else {
+      actionsRow.appendChild(el("button", {
+        class: "btn btn-dont danger-text",
+        onclick: () => {
+          const label = getDeckList().find((d) => d.key === key).label;
+          if (!window.confirm(`Eliminare definitivamente il mazzo "${label}"? Non è recuperabile.`)) return;
+          clearDeckOverride(key);
+          refreshDeckSelect();
+        },
+      }, "🗑 Elimina mazzo"));
+    }
+    editorPanel.appendChild(actionsRow);
+    editorPanel.appendChild(editorStatus);
+  }
+
+  function refreshDeckSelect(selectKey) {
+    deckSelect.innerHTML = "";
+    getDeckList().forEach((d) => deckSelect.appendChild(el("option", { value: d.key }, d.label)));
+    if (selectKey) deckSelect.value = selectKey;
+    renderCardEditor(deckSelect.value);
+  }
+
+  deckSelect.addEventListener("change", () => renderCardEditor(deckSelect.value));
+  wrap.appendChild(deckSelect);
+  wrap.appendChild(editorPanel);
+  refreshDeckSelect();
+
+  return wrap;
+}
+
+/* ---------- rendering: regole ---------- */
+
+function renderRulesScreen() {
+  const wrap = el("div", { class: "setup-panel rules-panel" });
+  wrap.appendChild(renderBackHome());
+  wrap.appendChild(el("h1", {}, "Come si gioca"));
+  wrap.appendChild(el("p", { class: "subtitle" }, "Le regole di Dubito: Concetti, passo per passo."));
+
+  const sections = [
+    ["Materiale", "Ogni team riceve delle carte fisiche numerate: il numero sta da un lato, il concetto da indovinare dall'altro. Il dispositivo che guida il gioco gestisce punteggi, turni e mostra le definizioni quando serve."],
+    ["Il turno", "A turno, il team attivo sceglie quale carta fisica giocare (indicandone il numero) e dichiara ad alta voce se conosce o non conosce il concetto scritto sopra."],
+    ["Dichiarazioni degli altri team", "Anche gli altri team, uno alla volta, dichiarano se conoscono o non conoscono lo stesso concetto."],
+    ["Le mosse del team attivo", "Se aveva dichiarato di conoscerlo, il team attivo può enunciare direttamente la risposta: +2 punti se corretta, -2 se sbagliata, turno chiuso. In alternativa può dubitare di un team che ha dichiarato di conoscerlo."],
+    ["La sfida (dubito)", "Il team dubitato sceglie se tentare la risposta (rischio -2 se sbaglia, +1 se indovina e turno chiuso) oppure ammettere di non sapere (-1 punto sicuro). Se il dubitato fallisce, il team attivo può a sua volta enunciare la propria risposta (se l'aveva dichiarata) oppure dubitare un altro team, a catena."],
+    ["Ultimo tentativo", "Se nessun team indovina e le opzioni si esauriscono, il team attivo ha un ultimo tentativo di risposta (+2 se corretta, -2 se sbagliata), oppure può passare senza rischiare punti."],
+    ["Bonus onestà", "Ogni team che ha dichiarato di conoscere il concetto ma non è mai stato messo alla prova (né dal dubbio né come propria risposta) riceve +1 punto automatico a fine turno."],
+    ["Correzioni e pause", "In ogni momento si possono correggere manualmente i punteggi, mettere in pausa la partita (nasconde il contenuto della carta), tornare al menu senza perdere la partita in corso, oppure terminarla definitivamente."],
+    ["Fine partita", "La partita finisce quando tutte le carte sono state giocate, oppure quando il/la formatore/trice la termina manualmente. Vince il team con più punti."],
+  ];
+
+  sections.forEach(([title, text]) => {
+    wrap.appendChild(el("div", { class: "rule-block" }, el("h3", {}, title), el("p", { class: "instructions rule-text" }, text)));
+  });
+
+  return wrap;
+}
+
+/* ---------- rendering: partita in corso ---------- */
 
 function render() {
   const root = document.getElementById("app");
@@ -365,7 +849,7 @@ function renderTopBar() {
     bar.appendChild(el("button", { class: "icon-btn", onclick: togglePause }, state.paused ? "▶ Riprendi" : "⏸ Pausa"));
     bar.appendChild(el("button", { class: "icon-btn danger", onclick: endGameNow }, "⏹ Termina"));
   }
-  bar.appendChild(el("button", { class: "icon-btn", onclick: goToMenu }, "🏠 Menu"));
+  bar.appendChild(el("button", { class: "icon-btn", onclick: showHome }, "🏠 Menu"));
   return bar;
 }
 
@@ -538,7 +1022,16 @@ function renderGameOver() {
   const list = el("ol", { class: "final-ranking" });
   sorted.forEach((t) => list.appendChild(el("li", { class: t.color }, `${t.name} — ${t.score} punti`)));
   wrap.appendChild(list);
-  wrap.appendChild(el("button", { class: "btn btn-know", onclick: () => showSetup() }, "Nuova partita"));
+  wrap.appendChild(el("button", {
+    class: "btn btn-know",
+    onclick: () => {
+      state = null;
+      historyStack = [];
+      redoStack = [];
+      showNewGameSetup();
+    },
+  }, "Nuova partita"));
+  wrap.appendChild(el("button", { class: "btn btn-dont", onclick: showHome }, "Torna al menu"));
   return wrap;
 }
 
@@ -581,7 +1074,7 @@ function csvToCards(text) {
 
 function downloadSampleCSV() {
   const header = "term,definition\n";
-  const body = DECKS.cybersecurity.cards.map((c) => `"${c.term}","${c.definition.replace(/"/g, '""')}"`).join("\n");
+  const body = BUILTIN_DECKS.cybersecurity.cards.map((c) => `"${c.term}","${c.definition.replace(/"/g, '""')}"`).join("\n");
   const blob = new Blob([header + body], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -637,282 +1130,4 @@ function printDeck(numberedPool) {
   window.print();
 }
 
-/* ---------- setup screen ---------- */
-
-function showSetup() {
-  const root = document.getElementById("app");
-  root.innerHTML = "";
-
-  let uploadedCards = null;
-  let nameInputs = [];
-  let assignInputs = [];
-
-  const wrap = el("div", { class: "setup-panel" });
-  wrap.appendChild(el("h1", {}, "Dubito: Concetti"));
-  wrap.appendChild(el("p", { class: "subtitle" }, "Un gioco di bluff sui concetti visti in classe."));
-
-  const numsRow = el("div", { class: "nums-row" });
-  const teamCountInput = el("input", { type: "number", min: "2", max: "6", value: "4" });
-  const cardsPerTeamInput = el("input", { type: "number", min: "2", max: "8", value: "4" });
-  numsRow.appendChild(el("div", { class: "name-field" }, el("label", {}, "Numero di team"), teamCountInput));
-  numsRow.appendChild(el("div", { class: "name-field" }, el("label", {}, "Carte per team"), cardsPerTeamInput));
-  wrap.appendChild(numsRow);
-
-  wrap.appendChild(el("label", {}, "Mazzo di concetti"));
-  const deckSelect = el("select", {});
-  deckSelect.appendChild(el("option", { value: "builtin:cybersecurity" }, "Cybersecurity (integrato)"));
-  deckSelect.appendChild(el("option", { value: "csv" }, "Carica un CSV personalizzato"));
-  wrap.appendChild(deckSelect);
-
-  const csvBlock = el("div", { class: "csv-block", style: "display:none" });
-  const csvInput = el("input", { type: "file", accept: ".csv" });
-  const csvStatus = el("p", { class: "csv-status" }, "");
-  csvInput.addEventListener("change", () => {
-    const file = csvInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      uploadedCards = csvToCards(String(reader.result));
-      csvStatus.textContent = `${uploadedCards.length} concetti caricati da "${file.name}".`;
-      refreshReferenceTable();
-    };
-    reader.readAsText(file, "UTF-8");
-  });
-  const sampleLink = el("a", { href: "#", class: "sample-link", onclick: (e) => { e.preventDefault(); downloadSampleCSV(); } }, "Scarica un CSV di esempio");
-  csvBlock.appendChild(el("p", { class: "csv-hint" }, "Colonne: term, definition (prima riga facoltativa come intestazione)."));
-  csvBlock.appendChild(csvInput);
-  csvBlock.appendChild(csvStatus);
-  csvBlock.appendChild(sampleLink);
-  wrap.appendChild(csvBlock);
-
-  function getSelectedPool() {
-    if (deckSelect.value === "csv") {
-      if (!uploadedCards || uploadedCards.length === 0) return null;
-      return uploadedCards;
-    }
-    return DECKS.cybersecurity.cards;
-  }
-
-  function updateSourceVisibility() {
-    const isCsv = deckSelect.value === "csv";
-    csvBlock.style.display = isCsv ? "block" : "none";
-    editBtn.style.display = isCsv ? "none" : "inline-block";
-    if (isCsv) editorPanel.style.display = "none";
-    refreshReferenceTable();
-  }
-
-  deckSelect.addEventListener("change", updateSourceVisibility);
-
-  // editor del mazzo integrato
-  const editBtn = el("button", { class: "btn btn-dont edit-btn" }, "✏️ Modifica le carte del mazzo integrato");
-  wrap.appendChild(editBtn);
-  const editorPanel = el("div", { class: "editor-panel", style: "display:none" });
-  wrap.appendChild(editorPanel);
-
-  let editorUnlocked = false;
-  editBtn.addEventListener("click", () => {
-    const visible = editorPanel.style.display !== "none";
-    if (visible) { editorPanel.style.display = "none"; return; }
-    if (!editorUnlocked) {
-      const pw = window.prompt("Inserisci la password per modificare le carte:");
-      if (pw === null) return;
-      if (pw !== EDITOR_PASSWORD) { errorBox.textContent = "Password errata."; return; }
-      editorUnlocked = true;
-    }
-    errorBox.textContent = "";
-    editorPanel.style.display = "block";
-    renderEditor();
-  });
-
-  function renderEditor() {
-    editorPanel.innerHTML = "";
-    editorPanel.appendChild(el("p", { class: "csv-hint" }, "Max 60 caratteri per il concetto, max 300 per la definizione. Le modifiche restano salvate su questo browser/dispositivo finché non le ripristini."));
-
-    const rowInputs = DECKS.cybersecurity.cards.map((c) => ({
-      termInput: el("input", { type: "text", maxlength: "60", value: c.term }),
-      defInput: el("textarea", { maxlength: "300", rows: "2" }, c.definition),
-    }));
-
-    rowInputs.forEach((r, i) => {
-      const termCounter = el("span", { class: "char-counter" }, `${r.termInput.value.length}/60`);
-      const defCounter = el("span", { class: "char-counter" }, `${r.defInput.value.length}/300`);
-      r.termInput.addEventListener("input", () => { termCounter.textContent = `${r.termInput.value.length}/60`; });
-      r.defInput.addEventListener("input", () => { defCounter.textContent = `${r.defInput.value.length}/300`; });
-
-      editorPanel.appendChild(
-        el(
-          "div", { class: "editor-row" },
-          el("span", { class: "editor-num" }, `#${i + 1}`),
-          el(
-            "div", { class: "editor-fields" },
-            el("div", { class: "editor-field-label" }, el("label", {}, "Concetto"), termCounter),
-            r.termInput,
-            el("div", { class: "editor-field-label" }, el("label", {}, "Definizione"), defCounter),
-            r.defInput
-          )
-        )
-      );
-    });
-
-    const editorStatus = el("p", { class: "csv-status" }, "");
-    const saveBtn = el("button", {
-      class: "btn btn-know",
-      onclick: () => {
-        const updated = rowInputs.map((r, i) => ({
-          term: r.termInput.value.trim() || DECKS.cybersecurity.cards[i].term,
-          definition: r.defInput.value.trim(),
-        }));
-        saveCustomDeck(updated);
-        editorStatus.textContent = "Modifiche salvate su questo dispositivo.";
-        refreshReferenceTable();
-      },
-    }, "💾 Salva modifiche");
-    const resetBtn = el("button", {
-      class: "btn btn-dont",
-      onclick: () => {
-        if (!window.confirm("Ripristinare i concetti originali? Le modifiche salvate andranno perse.")) return;
-        resetCustomDeck();
-        renderEditor();
-        refreshReferenceTable();
-      },
-    }, "↺ Ripristina originali");
-
-    editorPanel.appendChild(el("div", { class: "btn-row wrap" }, saveBtn, resetBtn));
-    editorPanel.appendChild(editorStatus);
-  }
-
-  // stampa mazzo
-  const printBtn = el("button", {
-    class: "btn btn-dont print-btn",
-    onclick: () => {
-      const pool = getSelectedPool();
-      if (!pool) { errorBox.textContent = "Seleziona o carica un mazzo prima di stampare."; return; }
-      errorBox.textContent = "";
-      printDeck(numberPool(pool));
-    },
-  }, "🖨 Stampa le carte fisiche");
-  wrap.appendChild(printBtn);
-
-  // assegnazione manuale
-  const manualToggleWrap = el("div", { class: "manual-toggle" });
-  const manualCheckbox = el("input", { type: "checkbox", id: "manual-assign" });
-  manualToggleWrap.appendChild(manualCheckbox);
-  manualToggleWrap.appendChild(el("label", { for: "manual-assign" }, "Assegna le carte manualmente ai team (carte fisiche già distribuite)"));
-  wrap.appendChild(manualToggleWrap);
-
-  const refDetails = el("details", { class: "ref-details" });
-  refDetails.appendChild(el("summary", {}, "Riferimento numero → concetto"));
-  const refTableBody = el("div", { class: "ref-table" });
-  refDetails.appendChild(refTableBody);
-  wrap.appendChild(refDetails);
-
-  function refreshReferenceTable() {
-    refTableBody.innerHTML = "";
-    const pool = getSelectedPool();
-    if (!pool) { refTableBody.appendChild(el("p", { class: "csv-hint" }, "Nessun mazzo selezionato.")); return; }
-    numberPool(pool).forEach((c) => {
-      refTableBody.appendChild(el("div", { class: "ref-row" }, el("span", { class: "ref-num" }, `#${c.id}`), el("span", {}, c.term)));
-    });
-  }
-  refreshReferenceTable();
-  updateSourceVisibility();
-
-  const namesWrap = el("div", { class: "names-grid" });
-  wrap.appendChild(namesWrap);
-
-  function renderTeamFields(count) {
-    namesWrap.innerHTML = "";
-    nameInputs = [];
-    assignInputs = [];
-    for (let i = 0; i < count; i++) {
-      const nameInput = el("input", { type: "text", placeholder: `Team ${i + 1}` });
-      nameInputs.push(nameInput);
-      const field = el("div", { class: "name-field" }, el("label", {}, `Team ${i + 1}`), nameInput);
-      if (manualCheckbox.checked) {
-        const assignInput = el("input", { type: "text", placeholder: "es. 1,5,9,13" });
-        assignInputs.push(assignInput);
-        field.appendChild(el("label", { class: "assign-label" }, "Numeri carte"));
-        field.appendChild(assignInput);
-      } else {
-        assignInputs.push(null);
-      }
-      namesWrap.appendChild(field);
-    }
-  }
-  renderTeamFields(4);
-
-  teamCountInput.addEventListener("change", () => {
-    let n = parseInt(teamCountInput.value, 10);
-    if (Number.isNaN(n)) n = 4;
-    n = Math.max(2, Math.min(6, n));
-    teamCountInput.value = n;
-    renderTeamFields(n);
-  });
-  manualCheckbox.addEventListener("change", () => {
-    renderTeamFields(parseInt(teamCountInput.value, 10) || 4);
-  });
-
-  const errorBox = el("p", { class: "error-box" }, "");
-  wrap.appendChild(errorBox);
-
-  wrap.appendChild(
-    el("button", {
-      class: "btn btn-know start-btn",
-      onclick: () => {
-        const teamCount = Math.max(2, Math.min(6, parseInt(teamCountInput.value, 10) || 4));
-        const cardsPerTeam = Math.max(2, Math.min(8, parseInt(cardsPerTeamInput.value, 10) || 4));
-        const needed = teamCount * cardsPerTeam;
-
-        const pool = getSelectedPool();
-        if (!pool) { errorBox.textContent = "Carica prima un CSV valido, oppure scegli il mazzo integrato."; return; }
-
-        const numbered = numberPool(pool);
-        const teamNames = nameInputs.map((inp, i) => inp.value.trim() || `Team ${i + 1}`);
-
-        if (manualCheckbox.checked) {
-          const assignments = [];
-          const usedNumbers = new Set();
-          for (let i = 0; i < teamCount; i++) {
-            const raw = (assignInputs[i] && assignInputs[i].value) || "";
-            const numbers = raw.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n));
-            if (numbers.length !== cardsPerTeam) {
-              errorBox.textContent = `${teamNames[i]}: servono esattamente ${cardsPerTeam} numeri, ne hai inseriti ${numbers.length}.`;
-              return;
-            }
-            for (const n of numbers) {
-              if (n < 1 || n > numbered.length) {
-                errorBox.textContent = `${teamNames[i]}: il numero ${n} non esiste nel mazzo (1–${numbered.length}).`;
-                return;
-              }
-              if (usedNumbers.has(n)) {
-                errorBox.textContent = `Il numero ${n} è assegnato a più di un team.`;
-                return;
-              }
-              usedNumbers.add(n);
-            }
-            assignments.push(numbers);
-          }
-          errorBox.textContent = "";
-          historyStack = [];
-          redoStack = [];
-          state = initStateManual(numbered, teamNames, assignments);
-          render();
-        } else {
-          if (numbered.length < needed) {
-            errorBox.textContent = `Servono almeno ${needed} concetti (${teamCount} team × ${cardsPerTeam} carte), il mazzo scelto ne ha solo ${numbered.length}.`;
-            return;
-          }
-          errorBox.textContent = "";
-          historyStack = [];
-          redoStack = [];
-          state = initStateAuto(numbered, teamNames, cardsPerTeam);
-          render();
-        }
-      },
-    }, "Inizia partita")
-  );
-
-  root.appendChild(wrap);
-}
-
-document.addEventListener("DOMContentLoaded", showSetup);
+document.addEventListener("DOMContentLoaded", showHome);

@@ -6,14 +6,14 @@
 <title>Dubito: Concetti</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
 <style>
   :root {
     --ink: #11131a;
     --ink-2: #191c26;
     --ink-3: #23273370;
     --paper: #f3f1ea;
-    --paper-dim: #c7c4ba;
+    --paper-dim: #d8d5cb;
     --amber: #fecb00;
     --teal: #007c92;
     --magenta: #9c2aa0;
@@ -37,13 +37,15 @@
       var(--ink);
     color: var(--paper);
     font-family: 'Inter', sans-serif;
-    font-weight: 500;
+    font-weight: 600;
     -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, .revealed-card, .team-name, .btn {
     font-family: 'Space Grotesk', sans-serif;
   }
+
+  h3 { font-size: 1.05rem; font-weight: 700; margin: 6px 0 0; color: var(--amber); }
 
   #app {
     max-width: 720px;
@@ -100,9 +102,55 @@
   .subtitle {
     color: var(--paper-dim);
     font-size: 0.95rem;
-    font-weight: 500;
+    font-weight: 600;
     margin: 0 0 8px;
   }
+
+  /* ---------- home ---------- */
+  .home-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .home-btn {
+    width: 100%;
+    text-align: left;
+    font-size: 1.05rem;
+    padding: 16px 18px;
+  }
+
+  /* ---------- vedi mazzi ---------- */
+  .deck-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #ffffff08;
+    border: 1px solid #ffffff1a;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .deck-box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .deck-box-name { font-weight: 700; font-size: 1.1rem; color: var(--paper); }
+  .deck-box-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: var(--paper-dim);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  /* ---------- regole ---------- */
+  .rule-block { display: flex; flex-direction: column; gap: 4px; }
+  .rule-block h3 { margin-top: 0; }
+  .rule-text { font-weight: 600 !important; font-size: 0.98rem !important; color: var(--paper-dim) !important; }
+
+  .danger-text { color: var(--danger); }
   .setup-panel label {
     font-size: 0.78rem;
     text-transform: uppercase;
@@ -141,10 +189,10 @@
     padding: 14px;
     margin-top: -4px;
   }
-  .csv-hint { margin: 0; font-size: 0.8rem; color: var(--paper-dim); }
-  .csv-status { margin: 0; font-size: 0.8rem; color: var(--teal); }
-  .sample-link { color: var(--amber); font-size: 0.85rem; text-decoration: underline; }
-  .error-box { color: var(--danger); font-size: 0.85rem; min-height: 1.2em; margin: 0; }
+  .csv-hint { margin: 0; font-size: 0.8rem; font-weight: 600; color: var(--paper-dim); }
+  .csv-status { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--teal); }
+  .sample-link { color: var(--amber); font-size: 0.85rem; font-weight: 700; text-decoration: underline; }
+  .error-box { color: var(--danger); font-size: 0.85rem; font-weight: 700; min-height: 1.2em; margin: 0; }
   input[type="file"] { color: var(--paper); font-size: 0.85rem; }
 
   .print-btn { align-self: flex-start; margin-top: -6px; }
@@ -169,11 +217,11 @@
     cursor: pointer;
     font-size: 0.85rem;
     color: var(--paper-dim);
-    font-weight: 600;
+    font-weight: 700;
   }
   .ref-table { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-height: 220px; overflow-y: auto; }
-  .ref-row { display: flex; gap: 10px; font-size: 0.85rem; }
-  .ref-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); min-width: 2.6em; }
+  .ref-row { display: flex; gap: 10px; font-size: 0.85rem; font-weight: 600; }
+  .ref-num { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--amber); min-width: 2.6em; }
 
   .assign-label { margin-top: 6px; }
 
@@ -304,7 +352,7 @@
   .team-score {
     font-family: 'JetBrains Mono', monospace;
     font-size: 1.6rem;
-    font-weight: 500;
+    font-weight: 700;
     cursor: pointer;
     min-width: 1.6em;
     text-align: center;
@@ -346,7 +394,7 @@
   }
   .turn-banner strong { color: var(--paper); }
 
-  .instructions { margin: 0; color: var(--paper); font-size: 1.05rem; font-weight: 600; }
+  .instructions { margin: 0; color: var(--paper); font-size: 1.05rem; font-weight: 700; }
 
   .revealed-card {
     font-size: 1.8rem;
@@ -361,7 +409,7 @@
 
   .definition {
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.55;
     color: var(--paper);
     background: #ffffff0a;
@@ -402,7 +450,7 @@
     border-radius: 10px;
     border: none;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: transform 0.08s ease, filter 0.15s ease;
   }
@@ -433,12 +481,12 @@
   .log ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
   .log li {
     font-size: 0.88rem;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--paper-dim);
     border-bottom: 1px solid #ffffff0d;
     padding-bottom: 6px;
   }
-  .log li:first-child { color: var(--paper); font-weight: 600; }
+  .log li:first-child { color: var(--paper); font-weight: 700; }
 
   /* ---------- game over ---------- */
   .game-over { align-items: center; text-align: center; }
