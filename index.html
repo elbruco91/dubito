@@ -281,6 +281,42 @@
     resize: vertical;
   }
 
+  /* ---------- concetti fluttuanti ---------- */
+  #word-shuffle-overlay {
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #1c2130 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #241a24 0%, transparent 55%),
+      var(--ink);
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 9999;
+  }
+  .word-shuffle-hint {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .floating-word {
+    position: absolute;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+  }
+
   /* ---------- stampa ---------- */
   #print-sheet { display: none; }
   @media print {

@@ -44,6 +44,7 @@ Tutte le modifiche vengono salvate nel `localStorage` del browser/dispositivo us
 
 Durante la partita, dalla barra in alto:
 - **↶ Annulla / ↷ Ripeti** tornano indietro o rifanno l'ultima azione (fino a 60 passi);
+- **🌀 Concetti** apre una schermata a tutto schermo in cui tutte le parole del mazzo in uso fluttuano e rimbalzano sui bordi, in ordine sparso (come un vecchio screensaver): utile prima di iniziare o come pausa a effetto durante la partita. Si chiude con un clic in un punto qualsiasi (o con Esc);
 - **⏸ Pausa** nasconde il contenuto della carta corrente (utile se serve interrompere senza rivelare nulla);
 - **⏹ Termina** chiude la partita subito, congelando il punteggio attuale;
 - **🏠 Menu** torna alla schermata iniziale senza perdere la partita in corso (si riprende da "⏯ Riprendi partita").

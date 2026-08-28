@@ -142,9 +142,10 @@ function shuffle(arr) {
   return a;
 }
 
-function baseState(teams) {
+function baseState(teams, deckTerms) {
   return {
     teams,
+    deckTerms,
     activeTeamId: 0,
     round: 1,
     phase: "draw",
@@ -172,12 +173,12 @@ function initStateAuto(numberedPool, teamNames, cardsPerTeam) {
   const totalNeeded = teamNames.length * cardsPerTeam;
   const dealt = shuffle(numberedPool).slice(0, totalNeeded);
   const hands = teamNames.map((_, i) => dealt.slice(i * cardsPerTeam, (i + 1) * cardsPerTeam));
-  return baseState(buildTeams(teamNames, hands));
+  return baseState(buildTeams(teamNames, hands), numberedPool.map((c) => c.term));
 }
 
 function initStateManual(numberedPool, teamNames, assignments) {
   const hands = assignments.map((numbers) => numbers.map((n) => numberedPool[n - 1]));
-  return baseState(buildTeams(teamNames, hands));
+  return baseState(buildTeams(teamNames, hands), numberedPool.map((c) => c.term));
 }
 
 function activeTeam() { return state.teams[state.activeTeamId]; }
@@ -845,6 +846,9 @@ function renderTopBar() {
   const bar = el("div", { class: "top-bar" });
   bar.appendChild(el("button", { class: "icon-btn", onclick: undo }, "↶ Annulla"));
   bar.appendChild(el("button", { class: "icon-btn", onclick: redo }, "↷ Ripeti"));
+  if (state.deckTerms && state.deckTerms.length > 0) {
+    bar.appendChild(el("button", { class: "icon-btn", onclick: () => showWordShuffle(state.deckTerms) }, "🌀 Concetti"));
+  }
   if (!state.gameOver) {
     bar.appendChild(el("button", { class: "icon-btn", onclick: togglePause }, state.paused ? "▶ Riprendi" : "⏸ Pausa"));
     bar.appendChild(el("button", { class: "icon-btn danger", onclick: endGameNow }, "⏹ Termina"));
@@ -1084,6 +1088,77 @@ function downloadSampleCSV() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/* ---------- concetti fluttuanti (schermata a schermo intero) ---------- */
+
+const WORD_SHUFFLE_COLORS = ["amber", "teal", "magenta", "sage", "coral", "ok", "paper"];
+
+let wordShuffleRAF = null;
+let wordShuffleOverlay = null;
+let wordShuffleKeyHandler = null;
+
+function closeWordShuffle() {
+  if (wordShuffleRAF) { cancelAnimationFrame(wordShuffleRAF); wordShuffleRAF = null; }
+  if (wordShuffleKeyHandler) { document.removeEventListener("keydown", wordShuffleKeyHandler); wordShuffleKeyHandler = null; }
+  if (wordShuffleOverlay) { wordShuffleOverlay.remove(); wordShuffleOverlay = null; }
+}
+
+function showWordShuffle(terms) {
+  if (!terms || terms.length === 0) return;
+  closeWordShuffle();
+
+  const overlay = document.createElement("div");
+  overlay.id = "word-shuffle-overlay";
+  overlay.appendChild(el("p", { class: "word-shuffle-hint" }, "Clicca in un punto qualsiasi per chiudere"));
+
+  const spans = shuffle(terms).map((term, i) => {
+    const span = document.createElement("div");
+    span.className = "floating-word";
+    span.textContent = term;
+    span.style.color = `var(--${WORD_SHUFFLE_COLORS[i % WORD_SHUFFLE_COLORS.length]})`;
+    span.style.fontSize = `${(1.1 + Math.random()).toFixed(2)}rem`;
+    overlay.appendChild(span);
+    return span;
+  });
+
+  overlay.addEventListener("click", closeWordShuffle);
+  wordShuffleKeyHandler = (e) => { if (e.key === "Escape") closeWordShuffle(); };
+  document.addEventListener("keydown", wordShuffleKeyHandler);
+  document.body.appendChild(overlay);
+  wordShuffleOverlay = overlay;
+
+  const particles = spans.map((span) => {
+    const w = span.offsetWidth;
+    const h = span.offsetHeight;
+    const x = Math.random() * Math.max(1, window.innerWidth - w);
+    const y = Math.random() * Math.max(1, window.innerHeight - h);
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 50 + Math.random() * 70; // px al secondo, costante fra un rimbalzo e l'altro
+    span.style.left = `${x}px`;
+    span.style.top = `${y}px`;
+    return { el: span, x, y, w, h, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+  });
+
+  let lastTime = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    particles.forEach((p) => {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (p.x <= 0) { p.x = 0; p.vx = Math.abs(p.vx); }
+      else if (p.x + p.w >= width) { p.x = width - p.w; p.vx = -Math.abs(p.vx); }
+      if (p.y <= 0) { p.y = 0; p.vy = Math.abs(p.vy); }
+      else if (p.y + p.h >= height) { p.y = height - p.h; p.vy = -Math.abs(p.vy); }
+      p.el.style.left = `${p.x}px`;
+      p.el.style.top = `${p.y}px`;
+    });
+    wordShuffleRAF = requestAnimationFrame(frame);
+  }
+  wordShuffleRAF = requestAnimationFrame(frame);
 }
 
 /* ---------- stampa carte fisiche ---------- */
